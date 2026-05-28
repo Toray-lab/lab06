@@ -637,3 +637,144 @@ artifacts
 
 1 directory, 1 file
 ```
+
+
+
+#Homework
+Подготовка CPack для генерации пакетов
+```bash
+$ echo 'include(CPackConfig.cmake)' >> CMakeLists.txt
+$ cat > CPackConfig.cmake <<'EOF'
+include(InstallRequiredSystemLibraries)
+
+set(CPACK_PACKAGE_NAME "solver")
+set(CPACK_PACKAGE_VENDOR "${GITHUB_USERNAME}")
+set(CPACK_PACKAGE_CONTACT "${GITHUB_EMAIL}")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Solver for mathematical problems")
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/DESCRIPTION")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+
+set(CPACK_PACKAGE_VERSION_MAJOR 0)
+set(CPACK_PACKAGE_VERSION_MINOR 1)
+set(CPACK_PACKAGE_VERSION_PATCH 0)
+set(CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
+
+set(CPACK_GENERATOR "TGZ;DEB;RPM")
+
+include(CPack)
+EOF
+$ echo "Solver library and executable" > DESCRIPTION
+$ cat > LICENSE <<'EOF'
+MIT License
+Copyright (c) 2025 Toray-lab
+Permission is hereby granted...
+EOF
+```
+Создание конфигурационных файлов CI
+```bash
+cat > .travis.yml <<'EOF'
+language: cpp
+dist: focal
+
+jobs:
+  include:
+    # Linux: сборка DEB и RPM
+    - os: linux
+      name: "Linux (DEB, RPM)"
+      addons:
+        apt:
+          packages:
+            - rpm
+            - dpkg
+            - cmake
+            - build-essential
+      script:
+        - cmake -H. -B_build -DCMAKE_BUILD_TYPE=Release -DCPACK_GENERATOR="DEB;RPM"
+        - cmake --build _build --config Release
+        - cd _build
+        - cpack -G DEB -C Release
+        - cpack -G RPM -C Release
+        - ls -la *.deb *.rpm
+      deploy:
+        provider: releases
+        token: $GITHUB_TOKEN
+        file_glob: true
+        file: _build/*.{deb,rpm}
+        skip_cleanup: true
+        on:
+          tags: true
+
+    # macOS: сборка DMG
+    - os: osx
+      osx_image: xcode12.5
+      name: "macOS (DMG)"
+      script:
+        - cmake -H. -B_build -DCMAKE_BUILD_TYPE=Release -DCPACK_GENERATOR="DragNDrop"
+        - cmake --build _build --config Release
+- cd _build
+        - cpack -G DragNDrop -C Release
+        - ls -la *.dmg
+      deploy:
+        provider: releases
+        token: $GITHUB_TOKEN
+        file_glob: true
+        file: _build/*.dmg
+        skip_cleanup: true
+        on:
+          tags: true
+EOF
+$ cat > appveyor.yml <<'EOF'
+version: 1.0.{build}
+image: Visual Studio 2022
+platform: x64
+configuration: Release
+
+install:
+  - choco install wixtoolset -y
+
+build_script:
+  - cmake -H. -B_build -G "Visual Studio 17 2022" -A x64 -DCPACK_GENERATOR="WIX"
+  - cmake --build _build --config Release
+  - cd _build
+  - cpack -C Release
+
+artifacts:
+  - path: '_build/*.msi'
+    name: installer
+
+deploy:
+  - provider: GitHub
+    auth_token: $(GITHUB_TOKEN)
+    artifact: /.*\.msi/
+    draft: false
+    prerelease: false
+    on:
+      appveyor_repo_tag: true
+EOF
+```
+Отправка файлов в репозиторий
+```bash
+$ git add .travis.yml appveyor.yml CPackConfig.cmake DESCRIPTION LICENSE
+$ git commit -m "Add CI/CD configuration for automatic package building on tags"
+[main 0c5c620] Add CI/CD configuration for automatic package building on tags
+ 5 files changed, 91 insertions(+), 25 deletions(-)
+ create mode 100644 appveyor.yml
+$ git push origin main
+Username for 'https://github.com': Toray-lab
+Password for 'https://Toray-lab@github.com':
+Enumerating objects: 19, done.
+Counting objects: 100% (15/15), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (8/8), done.
+Writing objects: 100% (9/9), 1.94 KiB | 992.00 KiB/s, done.
+Total 9 (delta 2), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (2/2), completed with 1 local object.
+To https://github.com/Toray-lab/lab06
+   947bb73..7553adf  main -> main
+```
+Проверка: создание тега и автоматический релиз
+```bash
+$ git tag v0.1.0
+$ git push origin v0.1.0
+```
