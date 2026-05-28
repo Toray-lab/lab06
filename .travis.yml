@@ -1,5 +1,49 @@
 language: cpp
-script:
-- cmake -H. -B_build -DCMAKE_INSTALL_PREFIX=_install -DBUILD_TESTS=ON
-- cmake --build _build
-- cmake --build _build --target install
+dist: focal
+
+jobs:
+  include:
+    # Linux: сборка DEB и RPM
+    - os: linux
+      name: "Linux (DEB, RPM)"
+      addons:
+        apt:
+          packages:
+            - rpm
+            - dpkg
+            - cmake
+            - build-essential
+ script:
+        - cmake -H. -B_build -DCMAKE_BUILD_TYPE=Release -DCPACK_GENERATOR="DEB;RPM"
+        - cmake --build _build --config Release
+        - cd _build
+        - cpack -G DEB -C Release
+        - cpack -G RPM -C Release
+        - ls -la *.deb *.rpm
+      deploy:
+        provider: releases
+        token: $GITHUB_TOKEN
+        file_glob: true
+        file: _build/*.{deb,rpm}
+        skip_cleanup: true
+        on:
+          tags: true
+
+# macOS: сборка DMG
+    - os: osx
+      osx_image: xcode12.5
+      name: "macOS (DMG)"
+      script:
+        - cmake -H. -B_build -DCMAKE_BUILD_TYPE=Release -DCPACK_GENERATOR="DragNDrop"
+        - cmake --build _build --config Release
+        - cd _build
+        - cpack -G DragNDrop -C Release
+        - ls -la *.dmg
+ deploy:
+        provider: releases
+        token: $GITHUB_TOKEN
+        file_glob: true
+        file: _build/*.dmg
+        skip_cleanup: true
+        on:
+          tags: true
