@@ -1,4 +1,4 @@
-[![Build Status](https://app.travis-ci.com/Toray-lab/lab06.svg?token=Lebv9VyVWR2CUJgbvRjy&branch=main)
+![Build Status](https://app.travis-ci.com/Toray-lab/lab06.svg?token=Lebv9VyVWR2CUJgbvRjy&branch=main)
 # Отчёт к лабораторной работе №6
 Подготовка окружения
 ```bash
